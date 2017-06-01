@@ -28,8 +28,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.session.data.redis.RedisOperationsSessionRepository;
 
-import com.baomidou.mybatisplus.plugins.Page;
-
 /**
  * 权限检查类
  * 
@@ -47,9 +45,11 @@ public class Realm extends AuthorizingRealm {
 	// 权限
 	protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {
 		SimpleAuthorizationInfo info = new SimpleAuthorizationInfo();
-		Long userId = WebUtil.getCurrentUser();
+		Long userId = (Long) WebUtil.getCurrentUser();
 		Parameter parameter = new Parameter("sysAuthorizeService", "queryPermissionByUserId").setId(userId);
+		logger.info("{} execute queryPermissionByUserId start...", parameter.getNo());
 		List<?> list = provider.execute(parameter).getList();
+		logger.info("{} execute queryPermissionByUserId end.", parameter.getNo());
 		for (Object permission : list) {
 			if (StringUtils.isNotBlank((String) permission)) {
 				// 添加基于Permission的权限信息
@@ -66,13 +66,14 @@ public class Realm extends AuthorizingRealm {
 			throws AuthenticationException {
 		UsernamePasswordToken token = (UsernamePasswordToken) authcToken;
 		Map<String, Object> params = new HashMap<String, Object>();
-		params.put("countSql", 0);
 		params.put("enable", 1);
 		params.put("account", token.getUsername());
-		Parameter parameter = new Parameter("sysUserService", "query").setMap(params);
-		Page<?> pageInfo = provider.execute(parameter).getPage();
-		if (pageInfo.getTotal() == 1) {
-			SysUser user = (SysUser) pageInfo.getRecords().get(0);
+		Parameter parameter = new Parameter("sysUserService", "queryList").setMap(params);
+		logger.info("{} execute sysUserService.queryList start...", parameter.getNo());
+		List<?> list = provider.execute(parameter).getList();
+		logger.info("{} execute sysUserService.queryList end.", parameter.getNo());
+		if (list.size() == 1) {
+			SysUser user = (SysUser) list.get(0);
 			StringBuilder sb = new StringBuilder(100);
 			for (int i = 0; i < token.getPassword().length; i++) {
 				sb.append(token.getPassword()[i]);
@@ -98,23 +99,33 @@ public class Realm extends AuthorizingRealm {
 		SysSession record = new SysSession();
 		record.setAccount(account);
 		Parameter parameter = new Parameter("sysSessionService", "querySessionIdByAccount").setModel(record);
+		logger.info("{} execute querySessionIdByAccount start...", parameter.getNo());
 		List<?> sessionIds = provider.execute(parameter).getList();
+		logger.info("{} execute querySessionIdByAccount end.", parameter.getNo());
+		Subject currentUser = SecurityUtils.getSubject();
+		Session session = currentUser.getSession();
+		String currentSessionId= session.getId().toString();
 		if (sessionIds != null) {
 			for (Object sessionId : sessionIds) {
 				record.setSessionId((String) sessionId);
 				parameter = new Parameter("sysSessionService", "deleteBySessionId").setModel(record);
+				logger.info("{} execute deleteBySessionId start...", parameter.getNo());
 				provider.execute(parameter);
-				sessionRepository.delete((String) sessionId);
-				sessionRepository.cleanupExpiredSessions();
+				logger.info("{} execute deleteBySessionId end.", parameter.getNo());
+				if (!currentSessionId.equals(sessionId)) {
+					sessionRepository.delete((String) sessionId);
+					sessionRepository.cleanupExpiredSessions();
+				}
 			}
 		}
-		Subject currentUser = SecurityUtils.getSubject();
-		Session session = currentUser.getSession();
-		record.setSessionId(session.getId().toString());
+		// 保存用户
+		record.setSessionId(currentSessionId);
 		String host = (String) session.getAttribute("HOST");
 		record.setIp(StringUtils.isBlank(host) ? session.getHost() : host);
 		record.setStartTime(session.getStartTimestamp());
 		parameter = new Parameter("sysSessionService", "update").setModel(record);
+		logger.info("{} execute sysSessionService.update start...", parameter.getNo());
 		provider.execute(parameter);
+		logger.info("{} execute sysSessionService.update end.", parameter.getNo());
 	}
 }

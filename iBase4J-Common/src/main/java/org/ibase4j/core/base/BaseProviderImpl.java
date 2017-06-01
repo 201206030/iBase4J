@@ -7,12 +7,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.ibase4j.core.Constants;
 import org.ibase4j.core.util.ExceptionUtil;
+import org.ibase4j.core.util.InstanceUtil;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
 import com.alibaba.fastjson.JSON;
-import com.esotericsoftware.reflectasm.MethodAccess;
 
 public abstract class BaseProviderImpl implements ApplicationContextAware, BaseProvider {
 	protected static Logger logger = LogManager.getLogger();
@@ -23,36 +23,40 @@ public abstract class BaseProviderImpl implements ApplicationContextAware, BaseP
 	}
 
 	public Parameter execute(Parameter parameter) {
-		logger.info("请求：{}", JSON.toJSONString(parameter));
+		String no = parameter.getNo();
+		logger.info("{} request：{}", no, JSON.toJSONString(parameter));
 		Object service = applicationContext.getBean(parameter.getService());
 		try {
 			Long id = parameter.getId();
 			BaseModel model = parameter.getModel();
 			List<?> list = parameter.getList();
 			Map<?, ?> map = parameter.getMap();
+			String method = parameter.getMethod();
+			Object[] param = parameter.getParam();
 			Object result = null;
-			MethodAccess methodAccess = MethodAccess.get(service.getClass());
-			if (id != null) {
-				result = methodAccess.invoke(service, parameter.getMethod(), parameter.getId());
+			if (param != null) {
+				result = InstanceUtil.invokeMethod(service, method, param);
+			} else if (id != null) {
+				result = InstanceUtil.invokeMethod(service, method, id);
 			} else if (model != null) {
-				result = methodAccess.invoke(service, parameter.getMethod(), parameter.getModel());
+				result = InstanceUtil.invokeMethod(service, method, model);
 			} else if (list != null) {
-				result = methodAccess.invoke(service, parameter.getMethod(), parameter.getList());
+				result = InstanceUtil.invokeMethod(service, method, list);
 			} else if (map != null) {
-				result = methodAccess.invoke(service, parameter.getMethod(), parameter.getMap());
+				result = InstanceUtil.invokeMethod(service, method, map);
 			} else {
-				result = methodAccess.invoke(service, parameter.getMethod());
+				result = InstanceUtil.invokeMethod(service, method);
 			}
 			if (result != null) {
 				Parameter response = new Parameter(result);
-				logger.info("响应：{}", JSON.toJSONString(response));
+				logger.info("{} response：{}", no, JSON.toJSONString(response));
 				return response;
 			}
-			logger.info("空响应");
+			logger.info("{} response empty.", no);
 			return null;
 		} catch (Exception e) {
 			String msg = ExceptionUtil.getStackTraceAsString(e);
-			logger.error(Constants.Exception_Head + msg, e);
+			logger.error(no + " " + Constants.Exception_Head + msg, e);
 			throw e;
 		}
 	}

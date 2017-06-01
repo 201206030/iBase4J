@@ -34,9 +34,16 @@
 
 ## 启动说明
     * 项目依赖activemq、Redis和ZooKeeper服务。
-    * 启动SYS-Service命令：clean package -P build tomcat7:run-war-only -f pom-sys-service-server.xml
-    * 启动Web命令：clean package -P build tomcat7:run-war-only -f pom-sys-web-server.xml
     * 使用nginx代理UI：修改配置里的UI目录后重启nginx。
+    * 启动命令：
+    	 clean package -P build tomcat7:run-war-only -f pom-sys-service-server.xml
+    	 clean package -P build tomcat7:run-war-only -f pom-sys-web-server.xml
+    * 打包命令：
+    	 clean package -P build -f pom-sys-service-server.xml
+    	 clean package -P build -f pom-sys-service-server.xml
+    * 生产环境打包命令：
+    	 clean package -P product -f pom-sys-service-server.xml
+    	 clean package -P product -f pom-sys-service-server.xml
     
 ## 版权声明
 iBase4J使用 [Apache License 2.0][] 协议.
@@ -44,11 +51,10 @@ iBase4J使用 [Apache License 2.0][] 协议.
 ## 建议
 可以先看一下拆分前的版本，地址：[iBase4J-old][].
 
-## 加入QQ群[538240548](http://shang.qq.com/wpa/qunwpa?idkey=b0fb32618d54e6a7f3cb718cd469b2952c8a968b1ef6f17fd68c83338ae4bce3) [498085331](http://shang.qq.com/wpa/qunwpa?idkey=0a7344955bb9b9f6e366d34be42c02709c933f308ab435b1a52ac17d40efdff5)
+## 加入QQ群[538240548](http://shang.qq.com/wpa/qunwpa?idkey=b0fb32618d54e6a7f3cb718cd469b2952c8a968b1ef6f17fd68c83338ae4bce3)
 交流技术问题，下载项目文档和一键启动依赖服务工具。
 
 ![QQ群](http://git.oschina.net/iBase4J/iBase4J/raw/master/img/1464169485871.png "QQ群一")
-![QQ群](http://git.oschina.net/iBase4J/iBase4J/raw/master/img/1482378175294.png "QQ群二")
 
 ## UI效果图
 

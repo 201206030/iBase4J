@@ -9,7 +9,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.ibase4j.core.util.InstanceUtil;
 import org.ibase4j.core.util.PropertiesUtil;
-import org.redisson.Redisson;
 import org.redisson.api.RBucket;
 import org.redisson.api.RType;
 import org.redisson.api.RedissonClient;
@@ -35,7 +34,7 @@ public class RedissonHelper implements CacheManager, ApplicationContextAware {
 		if (redisTemplate == null) {
 			synchronized (RedissonHelper.class) {
 				if (redisTemplate == null) {
-					redisTemplate = applicationContext.getBean(Redisson.class);
+					redisTemplate = applicationContext.getBean(RedissonClient.class);
 				}
 			}
 		}
@@ -54,14 +53,14 @@ public class RedissonHelper implements CacheManager, ApplicationContextAware {
 
 	public final void set(final String key, final Serializable value) {
 		RBucket<Object> temp = getRedisBucket(key);
-		expire(temp, EXPIRE);
 		temp.set(value);
+        expire(temp, EXPIRE);
 	}
 
 	public final void set(final String key, final Serializable value, int seconds) {
 		RBucket<Object> temp = getRedisBucket(key);
-		expire(temp, seconds);
 		temp.set(value);
+        expire(temp, seconds);
 	}
 
 	public final void multiSet(final Map<String, Object> temps) {
@@ -95,7 +94,7 @@ public class RedissonHelper implements CacheManager, ApplicationContextAware {
 	 * @return
 	 */
 	private final void expire(final RBucket<Object> bucket, final int seconds) {
-		bucket.expireAsync(seconds, TimeUnit.SECONDS);
+		bucket.expire(seconds, TimeUnit.SECONDS);
 	}
 
 	/**

@@ -11,15 +11,6 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.UnauthorizedException;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.ibase4j.core.base.AbstractController;
-import org.ibase4j.core.base.Parameter;
-import org.ibase4j.core.support.Assert;
-import org.ibase4j.core.support.HttpCode;
-import org.ibase4j.core.util.SecurityUtil;
-import org.ibase4j.core.util.UploadUtil;
-import org.ibase4j.core.util.WebUtil;
-import org.ibase4j.model.SysUser;
-import org.ibase4j.provider.ISysProvider;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +19,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.ibase4j.core.base.AbstractController;
+import org.ibase4j.core.base.Parameter;
+import org.ibase4j.core.support.Assert;
+import org.ibase4j.core.support.HttpCode;
+import org.ibase4j.core.util.SecurityUtil;
+import org.ibase4j.core.util.UploadUtil;
+import org.ibase4j.model.SysUser;
+import org.ibase4j.provider.ISysProvider;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -53,6 +52,9 @@ public class SysUserController extends AbstractController<ISysProvider> {
 		Assert.isNotBlank(param.getAccount(), "ACCOUNT");
 		Assert.length(param.getAccount(), 3, 15, "ACCOUNT");
 		if (param.getId() != null) {
+			if (param.getEnable() == null) {
+				param.setEnable(1);
+			}
 			Parameter parameter = new Parameter(getService(), "queryById").setId(param.getId());
 			SysUser user = (SysUser) provider.execute(parameter).getModel();
 			Assert.notNull(user, "USER", param.getId());
@@ -61,6 +63,8 @@ public class SysUserController extends AbstractController<ISysProvider> {
 					param.setPassword(SecurityUtil.encryptPassword(param.getPassword()));
 				}
 			}
+		} else if (StringUtils.isNotBlank(param.getPassword())) {
+			param.setPassword(SecurityUtil.encryptPassword(param.getPassword()));
 		}
 		return super.update(modelMap, param);
 	}
@@ -98,7 +102,9 @@ public class SysUserController extends AbstractController<ISysProvider> {
 		SysUser sysUser = (SysUser) provider.execute(parameter).getModel();
 		modelMap.put("user", sysUser);
 		parameter = new Parameter("sysAuthorizeService", "queryAuthorizeByUserId").setId(id);
+		logger.info("{} execute queryAuthorizeByUserId start...", parameter.getNo());
 		List<?> menus = provider.execute(parameter).getList();
+		logger.info("{} execute queryAuthorizeByUserId end.", parameter.getNo());
 		modelMap.put("menus", menus);
 		return setSuccessModelMap(modelMap);
 	}
@@ -115,7 +121,7 @@ public class SysUserController extends AbstractController<ISysProvider> {
 	@ApiOperation(value = "修改个人信息")
 	@PostMapping(value = "/update/person")
 	public Object updatePerson(ModelMap modelMap, @RequestBody SysUser param) {
-		param.setId(WebUtil.getCurrentUser());
+		param.setId(getCurrUser());
 		param.setPassword(null);
 		Assert.isNotBlank(param.getAccount(), "ACCOUNT");
 		Assert.length(param.getAccount(), 3, 15, "ACCOUNT");
@@ -125,13 +131,16 @@ public class SysUserController extends AbstractController<ISysProvider> {
 	@ApiOperation(value = "修改用户头像")
 	@PostMapping(value = "/update/avatar")
 	public Object updateAvatar(HttpServletRequest request, ModelMap modelMap) {
-		List<String> fileNames = UploadUtil.uploadImage(request, false);
+		List<String> fileNames = UploadUtil.uploadImageData(request);
 		if (fileNames.size() > 0) {
 			SysUser param = new SysUser();
-			param.setId(WebUtil.getCurrentUser());
-			String filePath = UploadUtil.getUploadDir(request) + fileNames.get(0);
-			String avatar = UploadUtil.remove2DFS("sysUser", "U" + param.getId(), filePath).getRemotePath();
-			param.setAvatar(avatar);
+			param.setId(getCurrUser());
+			for (int i = 0; i < fileNames.size(); i++) {
+				String filePath = UploadUtil.getUploadDir(request) + fileNames.get(i);
+				String avatar = UploadUtil.remove2DFS("sysUser", "U" + param.getId(), filePath).getRemotePath();
+				param.setAvatar(avatar);
+			}
+			modelMap.put("data", param);
 			return super.update(modelMap, param);
 		} else {
 			setModelMap(modelMap, HttpCode.BAD_REQUEST);
@@ -144,29 +153,20 @@ public class SysUserController extends AbstractController<ISysProvider> {
 	@ApiOperation(value = "修改密码")
 	@PostMapping(value = "/update/password")
 	public Object updatePassword(ModelMap modelMap, @RequestBody SysUser param) {
-		Assert.notNull(param.getId(), "USER_ID");
 		Assert.isNotBlank(param.getOldPassword(), "OLDPASSWORD");
 		Assert.isNotBlank(param.getPassword(), "PASSWORD");
+		Long userId = getCurrUser();
 		String encryptPassword = SecurityUtil.encryptPassword(param.getOldPassword());
-		Parameter parameter = new Parameter(getService(), "queryById").setId(param.getId());
+		Parameter parameter = new Parameter(getService(), "queryById").setId(userId);
+		logger.info("{} execute queryById start...", parameter.getNo());
 		SysUser sysUser = (SysUser) provider.execute(parameter).getModel();
+		logger.info("{} execute queryById end.", parameter.getNo());
 		Assert.notNull(sysUser, "USER", param.getId());
-		Long userId = WebUtil.getCurrentUser();
-		if (!param.getId().equals(userId)) {
-			SysUser current = new SysUser();
-			current.setId(userId);
-			parameter = new Parameter(getService(), "queryById").setId(current.getId());
-			SysUser user = (SysUser) provider.execute(parameter).getModel();
-			if (user.getUserType() == 1) {
-				throw new UnauthorizedException("您没有权限修改用户密码.");
-			}
-		} else {
-			if (!sysUser.getPassword().equals(encryptPassword)) {
-				throw new UnauthorizedException("原密码错误.");
-			}
+		if (!sysUser.getPassword().equals(encryptPassword)) {
+			throw new UnauthorizedException("原密码错误.");
 		}
 		param.setPassword(encryptPassword);
-		param.setUpdateBy(WebUtil.getCurrentUser());
+		param.setUpdateBy(getCurrUser());
 		return super.update(modelMap, param);
 	}
 }

@@ -28,7 +28,7 @@
 	</bean>
 	<!-- 缓存 -->
 	<bean id="redisCacheManager" class="org.redisson.spring.cache.RedissonSpringCacheManager">
-		<property name="redisson" ref="redissonClient" />
+		<constructor-arg index="0" ref="redissonClient" />
 	</bean>
 	
 	<!-- Jedis线程 -->
@@ -36,26 +36,26 @@
 		<property name="maxIdle" value="${redis.maxIdle}" />
 		<property name="minIdle" value="${redis.minIdle}" />
 		<property name="maxTotal" value="${redis.maxTotal}" />
+		<property name="maxWaitMillis" value="${redis.maxWaitMillis}" />
 		<property name="testOnBorrow" value="true" />
 	</bean>
-	<bean id="jedisShardInfo" class="redis.clients.jedis.JedisShardInfo">
+	<bean id="jedisShardInfo" class="org.ibase4j.core.support.cache.jedis.JedisShardInfo">
 		<constructor-arg index="0" value="${redis.host}" />
 		<constructor-arg index="1" value="${redis.port}" type="int" />
-		<!-- <property name="password" value="${redis.password}" /> -->
+		<property name="password" value="${redis.password}" />
 	</bean>
 	<!-- Redis连接 -->
 	<bean id="jedisConnectionFactory" class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory"
-		p:shard-info-ref="jedisShardInfo" p:pool-config-ref="jedisPoolConfig" />
+		p:pool-config-ref="jedisPoolConfig" p:shard-info-ref="jedisShardInfo" />
     <!-- 缓存序列化方式 -->
-    <!-- <bean id="keySerializer" class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+    <bean id="keySerializer" class="org.springframework.data.redis.serializer.StringRedisSerializer" />
 	<bean id="valueSerializer" class="org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer" />
-    <bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate"
-        p:connection-factory-ref="jedisConnectionFactory"
-        p:key-serializer-ref="keySerializer" p:value-serializer-ref="valueSerializer"
-        p:enableTransactionSupport="false" /> -->
-	<!-- 缓存 -->
-	<!-- <bean id="redisCacheManager" class="org.springframework.data.redis.cache.RedisCacheManager">
-		<constructor-arg index="0" ref="redisTemplate" />
-		<property name="defaultExpiration" value="${redis.expiration}" />
-	</bean> -->
+    <!-- 缓存 -->
+	<bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate">
+		<property name="connectionFactory" ref="jedisConnectionFactory" />
+		<property name="keySerializer" ref="keySerializer" />
+		<property name="valueSerializer" ref="valueSerializer" />
+		<property name="hashKeySerializer" ref="keySerializer" />
+		<property name="hashValueSerializer" ref="valueSerializer" />
+	</bean>
 </beans>
